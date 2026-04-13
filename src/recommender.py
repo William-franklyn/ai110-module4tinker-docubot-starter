@@ -8,6 +8,31 @@ DATA_PATH = Path(__file__).parent.parent / "data" / "songs.csv"
 FLOAT_FIELDS = {"energy", "valence", "danceability", "acousticness", "instrumentalness"}
 INT_FIELDS   = {"id", "tempo_bpm", "popularity"}
 
+# ---------------------------------------------------------------------------
+# Scoring weights — edit here to run experiments.
+#
+# EXPERIMENT: genre halved (2.0 -> 1.0), energy doubled (2.0 -> 4.0)
+# Hypothesis: energy proximity should drive recommendations more than genre
+# label, reducing the Bohemian-Rhapsody-in-chill-playlists problem and
+# surfacing songs that actually *feel* right over songs that are merely
+# tagged correctly.
+#
+# Original weights → MAX_SCORE = 9.0
+# W_GENRE, W_MOOD, W_MODE  = 2.0, 1.5, 0.5
+# W_ENERGY, W_VALENCE, W_TEMPO, W_DANCE, W_ACOUSTIC = 2.0, 1.0, 1.0, 0.5, 0.5
+# ---------------------------------------------------------------------------
+W_GENRE    = 1.0   # halved  (was 2.0) — genre label alone is too coarse
+W_MOOD     = 1.5
+W_MODE     = 0.5
+W_ENERGY   = 4.0   # doubled (was 2.0) — energy is the most perceptible quality
+W_VALENCE  = 1.0
+W_TEMPO    = 1.0
+W_DANCE    = 0.5
+W_ACOUSTIC = 0.5
+
+MAX_SCORE = W_GENRE + W_MOOD + W_MODE + W_ENERGY + W_VALENCE + W_TEMPO + W_DANCE + W_ACOUSTIC
+# MAX_SCORE = 1.0 + 1.5 + 0.5 + 4.0 + 1.0 + 1.0 + 0.5 + 0.5 = 10.0
+
 
 def load_songs(filepath=DATA_PATH):
     """Read songs.csv and return a list of dictionaries.
@@ -60,26 +85,26 @@ def score_song(song, user_profile):
         reasons — list of strings explaining every point contribution
 
     Categorical rules (binary — full points or zero):
-        genre match  ->  +2.0
-        mood  match  ->  +1.5
-        mode  match  ->  +0.5
+        genre match  ->  +W_GENRE  (currently 1.0)
+        mood  match  ->  +W_MOOD   (currently 1.5)
+        mode  match  ->  +W_MODE   (currently 0.5)
 
     Continuous rules (proximity — fraction of max points):
         Each earns  max_pts x (1.0 - |user_target - song_value|)
-        energy       ->  up to +2.0
-        valence      ->  up to +1.0
-        tempo_bpm    ->  up to +1.0  (normalised over 200 BPM ceiling)
-        danceability ->  up to +0.5
-        acousticness ->  up to +0.5
+        energy       ->  up to +W_ENERGY  (currently 4.0)
+        valence      ->  up to +W_VALENCE (currently 1.0)
+        tempo_bpm    ->  up to +W_TEMPO   (currently 1.0, normalised over 200 BPM ceiling)
+        danceability ->  up to +W_DANCE   (currently 0.5)
+        acousticness ->  up to +W_ACOUSTIC(currently 0.5)
 
-    Maximum possible score: 9.0
+    Maximum possible score: MAX_SCORE (currently 10.0)
     """
     score = 0.0
     reasons = []
 
     # --- categorical: genre ---
     if user_profile["preferred_genre"] in ("any", song["genre"]):
-        pts = 2.0
+        pts = W_GENRE
         score += pts
         reasons.append(f"genre match '{song['genre']}' (+{pts})")
     else:
@@ -90,7 +115,7 @@ def score_song(song, user_profile):
 
     # --- categorical: mood ---
     if user_profile["preferred_mood"] in ("any", song["mood"]):
-        pts = 1.5
+        pts = W_MOOD
         score += pts
         reasons.append(f"mood match '{song['mood']}' (+{pts})")
     else:
@@ -101,7 +126,7 @@ def score_song(song, user_profile):
 
     # --- categorical: mode ---
     if user_profile["preferred_mode"] in ("any", song["mode"]):
-        pts = 0.5
+        pts = W_MODE
         score += pts
         reasons.append(f"mode match '{song['mode']}' (+{pts})")
     else:
@@ -111,35 +136,35 @@ def score_song(song, user_profile):
         )
 
     # --- continuous: energy ---
-    pts = round(2.0 * (1.0 - abs(user_profile["target_energy"] - song["energy"])), 2)
+    pts = round(W_ENERGY * (1.0 - abs(user_profile["target_energy"] - song["energy"])), 2)
     score += pts
     reasons.append(
         f"energy {song['energy']} vs target {user_profile['target_energy']} (+{pts})"
     )
 
     # --- continuous: valence ---
-    pts = round(1.0 * (1.0 - abs(user_profile["target_valence"] - song["valence"])), 2)
+    pts = round(W_VALENCE * (1.0 - abs(user_profile["target_valence"] - song["valence"])), 2)
     score += pts
     reasons.append(
         f"valence {song['valence']} vs target {user_profile['target_valence']} (+{pts})"
     )
 
     # --- continuous: tempo ---
-    pts = round(1.0 * (1.0 - abs(user_profile["target_tempo_bpm"] - song["tempo_bpm"]) / 200), 2)
+    pts = round(W_TEMPO * (1.0 - abs(user_profile["target_tempo_bpm"] - song["tempo_bpm"]) / 200), 2)
     score += pts
     reasons.append(
         f"tempo {song['tempo_bpm']} BPM vs target {user_profile['target_tempo_bpm']} BPM (+{pts})"
     )
 
     # --- continuous: danceability ---
-    pts = round(0.5 * (1.0 - abs(user_profile["target_danceability"] - song["danceability"])), 2)
+    pts = round(W_DANCE * (1.0 - abs(user_profile["target_danceability"] - song["danceability"])), 2)
     score += pts
     reasons.append(
         f"danceability {song['danceability']} vs target {user_profile['target_danceability']} (+{pts})"
     )
 
     # --- continuous: acousticness ---
-    pts = round(0.5 * (1.0 - abs(user_profile["target_acousticness"] - song["acousticness"])), 2)
+    pts = round(W_ACOUSTIC * (1.0 - abs(user_profile["target_acousticness"] - song["acousticness"])), 2)
     score += pts
     reasons.append(
         f"acousticness {song['acousticness']} vs target {user_profile['target_acousticness']} (+{pts})"

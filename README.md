@@ -2,6 +2,267 @@
 
 ---
 
+## Stress Test — Six Profiles, Six Behaviors
+
+Run with: `python -m src.main`
+
+---
+
+### Profile 1 — High-Energy Pop
+
+Wants pop, euphoric, major, high energy (0.85), very happy valence (0.90), fast tempo (125 BPM).
+
+```
+  Listener : High-Energy Pop
+  Genre    : pop   Mood: euphoric   Mode: major
+  Energy   : 0.85   Valence: 0.9   Tempo: 125 BPM
+
+  #1  Blinding Lights by The Weeknd        7.92 / 9.0  [#################...]
+      + genre match 'pop' (+2.0)
+      + mood match 'euphoric' (+1.5)
+      + mode match 'major' (+0.5)
+      ~ energy 0.8 vs target 0.85 (+1.9)
+      ~ valence 0.33 vs target 0.9 (+0.43)    <-- big valence gap
+
+  #2  Temperature by Sean Paul             6.78 / 9.0  [###############.....]
+      ~ genre mismatch: wanted 'pop', got 'dancehall' (+0.0)
+      ~ valence 0.89 vs target 0.9 (+0.99)    <-- near-perfect valence match
+
+  #3  Superstition by Stevie Wonder        6.62 / 9.0
+  #4  Despacito by Luis Fonsi              6.51 / 9.0
+  #5  Smells Like Teen Spirit by Nirvana   4.14 / 9.0  [#########...]
+```
+
+**What to notice:** Blinding Lights wins on genre lock-in but has a terrible valence match (0.33 vs 0.90). Temperature scores almost as high on valence despite being the wrong genre. The genre bonus is the only thing keeping #1 ahead of #2–4.
+
+---
+
+### Profile 2 — Chill Lofi
+
+Wants chill mood, minor mode, very low energy (0.18), slow tempo (72 BPM), open genre.
+
+```
+  Listener : Chill Lofi
+  Genre    : any   Mood: chill   Mode: minor
+  Energy   : 0.18   Valence: 0.35   Tempo: 72 BPM
+
+  #1  Redbone by Childish Gambino          8.23 / 9.0  [##################..]
+      + genre match 'r&b' (+2.0)
+      + mood match 'chill' (+1.5)
+      + mode match 'minor' (+0.5)
+
+  #2  God's Plan by Drake                  7.99 / 9.0
+  #3  Space Song by Beach House            6.91 / 9.0
+  #4  Bohemian Rhapsody by Queen           6.74 / 9.0
+  #5  Clair de Lune by Debussy             6.65 / 9.0
+```
+
+**What to notice:** genre="any" means every song earns 2.0 pts, so the top 5 are decided almost entirely by mood and energy proximity. Bohemian Rhapsody sneaks into #4 purely because its tempo (72 BPM) is a perfect match — even though it's a dramatic rock song. The system is not wrong, but it's surprising.
+
+---
+
+### Profile 3 — Deep Intense Rock
+
+Wants rock, angry, minor, near-maximum energy (0.92), very dark (valence 0.22), electric (acousticness 0.01).
+
+```
+  Listener : Deep Intense Rock
+  Genre    : rock   Mood: angry   Mode: minor
+  Energy   : 0.92   Valence: 0.22   Tempo: 130 BPM
+
+  #1  Smells Like Teen Spirit by Nirvana   6.69 / 9.0  [##############......]
+      ~ genre mismatch: wanted 'rock', got 'grunge' (+0.0)
+      + mood match 'angry' (+1.5)
+      ~ energy 0.92 vs target 0.92 (+2.0)    <-- perfect energy hit
+
+  #2  Bohemian Rhapsody by Queen           5.87 / 9.0
+      + genre match 'rock' (+2.0)
+      ~ energy 0.41 vs target 0.92 (+0.98)   <-- energy miss costs 1.02 pts
+
+  #3  Mr. Brightside by The Killers        5.06 / 9.0
+  #4  SICKO MODE by Travis Scott           4.84 / 9.0
+  #5  Lose Yourself by Eminem              4.65 / 9.0
+```
+
+**What to notice:** Smells Like Teen Spirit is labeled "grunge" not "rock" — it loses the genre bonus entirely. But it still wins because it perfectly matches energy AND mood. Bohemian Rhapsody has the genre match but is too low-energy to compete. This shows that energy (up to 2.0 pts, continuous) can outweigh genre (exactly 2.0 pts, binary) when the energy gap is large enough.
+
+---
+
+### Profile 4 — Sad Bangers (adversarial: energy=0.90 + mood=melancholy)
+
+Conflicting preferences — high energy AND melancholy mood. No catalog song is both.
+
+```
+  Listener : Sad Bangers (adversarial)
+  Genre    : any   Mood: melancholy   Mode: minor
+  Energy   : 0.9   Valence: 0.2   Tempo: 140 BPM
+
+  #1  Smells Like Teen Spirit by Nirvana   7.05 / 9.0  ← won on energy, not mood
+      ~ mood mismatch: wanted 'melancholy', got 'angry' (+0.0)
+      ~ energy 0.92 vs target 0.9 (+1.96)
+
+  #2  Mr. Brightside by The Killers        7.02 / 9.0
+  #3  SICKO MODE by Travis Scott           6.98 / 9.0
+  #4  Fast Car by Tracy Chapman            6.98 / 9.0  ← only melancholy song in top 5
+      + mood match 'melancholy' (+1.5)
+      ~ energy 0.5 vs target 0.9 (+1.2)    ← energy miss costs 0.8 pts
+```
+
+**What to notice:** The top 3 all miss on mood but win on energy because genre="any" gives everyone 2.0 pts, making mood the differentiator — but even the +1.5 mood bonus for Fast Car (the actual melancholy song) can't overcome the energy penalty of 0.8 pts. The system can't satisfy both preferences simultaneously, so it picks whichever half of the contradiction scores higher numerically.
+
+---
+
+### Profile 5 — The Completist (adversarial: all preferences at midpoint)
+
+Every preference is dead-centre (0.5 energy, 0.5 valence, 100 BPM) with genre/mood/mode all "any."
+
+```
+  Listener : The Completist (adversarial)
+  Genre    : any   Mood: any   Mode: any
+  Energy   : 0.5   Valence: 0.5   Tempo: 100 BPM
+
+  #1  Fast Car by Tracy Chapman            8.85 / 9.0  [###################.]
+      + genre match 'folk' (+2.0)   ← "any" = auto full points
+      + mood match 'melancholy' (+1.5)
+      + mode match 'major' (+0.5)
+      ~ energy 0.5 vs target 0.5 (+2.0)   ← exact energy hit
+
+  #2  Slow Burn by Kacey Musgraves         8.44 / 9.0
+  #3  Bohemian Rhapsody by Queen           8.38 / 9.0
+  #4  God's Plan by Drake                  8.36 / 9.0
+  #5  Space Song by Beach House            8.36 / 9.0
+```
+
+**What to notice:** "any" gives every song all 4.0 categorical points, so the entire ranking collapses into numerical proximity. Fast Car wins because its energy (0.50) is a dead-perfect match and its tempo (97 BPM) is nearly identical to the 100 BPM target. The scores cluster in a narrow 8.36–8.85 band — the system has almost no discrimination because categorical points no longer separate anyone. This confirms that genre/mood specificity is what makes the recommender useful.
+
+---
+
+### Profile 6 — Classical Purist (adversarial: genre not well-represented in catalog)
+
+Wants classical, peaceful, minor, near-zero energy (0.01), very high acousticness (0.99). Only 2 classical songs exist.
+
+```
+  Listener : Classical Purist (adversarial)
+  Genre    : classical   Mood: peaceful   Mode: minor
+  Energy   : 0.01   Valence: 0.2   Tempo: 68 BPM
+
+  #1  Clair de Lune by Debussy             8.91 / 9.0  [###################.]
+      + genre match 'classical' (+2.0)
+      + mood match 'peaceful' (+1.5)
+      + mode match 'minor' (+0.5)
+      ~ energy 0.01 vs target 0.01 (+2.0)   ← exact hit
+
+  #2  Gymnopedie No. 1 by Satie            8.31 / 9.0
+      ~ mode mismatch: wanted 'minor', got 'major' (+0.0)   ← loses 0.5 pts
+
+  #3  Space Song by Beach House            5.48 / 9.0  [############........]
+      ← 3.43-point cliff between #2 and #3
+```
+
+**What to notice:** The top 2 are correct and separated clearly. But the 3.43-point cliff between #2 and #3 exposes the catalog thinness problem — once the 2 classical songs are exhausted, #3–5 are genre mismatches scraping by on mood proximity alone. A real system would say "we don't have enough classical to fill 5 spots" rather than padding with Space Song and Slow Burn.
+
+---
+
+## Evaluation — How Well Does It Actually Work?
+
+I ran five targeted experiments against the 18-song catalog using `python -m src.evaluate`. Here's what I found — the honest version, including where it breaks down.
+
+---
+
+### Experiment 1 — Perfect Match
+
+I built a profile that mirrors *Smells Like Teen Spirit* feature-for-feature: same genre, mood, mode, energy, valence, tempo, danceability, and acousticness. The result:
+
+```
+#1  Smells Like Teen Spirit   9.00 / 9.0  [####################]
+#2  Mr. Brightside            5.04 / 9.0  [###########.........]
+Gap to #2: 3.96 pts
+```
+
+**What this shows:** When the profile is a precise match, the scorer works exactly as intended. A 3.96-point gap between #1 and #2 is massive — there's no ambiguity in the ranking. The system is doing its job when the profile is specific.
+
+---
+
+### Experiment 2 — Orphan Genre (genre not in catalog)
+
+I set `preferred_genre = "jazz"` — a genre that doesn't appear anywhere in the 18-song catalog. No song earns the +2.0 genre points, so everything falls back on mood and numerical proximity alone.
+
+```
+Score range (top 5): 4.71 – 6.75
+Spread: 2.04 pts  (vs 6+ pts when genre matches)
+```
+
+**What this shows:** The genre weight is load-bearing. When it disappears, the entire top of the ranking compresses into a tight band and the #1 result (Redbone, an r&b song) wins by only 0.36 pts over #2. The system still functions, but its confidence collapses. This would be a real problem for listeners who prefer niche or unlabeled genres.
+
+---
+
+### Experiment 3 — Contradictory Profile
+
+I asked for `target_energy = 0.90` (very high) but `preferred_mood = "peaceful"`. No song in the catalog is both high-energy and peaceful — the two features pull in opposite directions.
+
+```
+#1  Space Song    7.50  mood=peaceful  energy=0.33   ← won on mood, not energy
+#2  Slow Burn     7.50  mood=peaceful  energy=0.36
+#3  Smells Like   7.21  mood=angry     energy=0.92   ← won on energy, not mood
+```
+
+**What this shows:** When a profile is self-contradictory, the mood label (worth 1.5 pts, binary) beats the energy target (worth up to 2.0 pts, continuous) because peaceful songs cluster together and all earn the mood bonus at once. The system picks the *least wrong* song, not the *right* song — because a right song doesn't exist. This is a fundamental limitation of static profiles with no feedback loop.
+
+---
+
+### Experiment 4 — Genre Lock-in vs "any"
+
+I ran Casey's profile (pop/euphoric) twice: once with `preferred_genre="pop"` and once with `"any"`. Surprising result:
+
+```
+genre=pop rank   │  genre=any rank
+─────────────────┼────────────────────────────
+#1  Blinding Lights  8.01  │  #1  Superstition   8.84
+#2  Superstition     6.84  │  #2  Temperature    8.79
+#3  Temperature      6.79  │  #3  Despacito      8.68
+#4  Despacito        6.68  │  #4  Blinding Lights 8.01
+```
+
+Blinding Lights scores **8.01 in both cases** — because `"any"` gives it the full genre 2.0 just like a direct match does. But every *other* song also gets those 2.0 points for free, and now Superstition and Temperature beat Blinding Lights on valence and tempo proximity. This reveals something important: Blinding Lights actually has a poor valence match (song=0.33 vs target=0.85). Genre lock-in was hiding that weakness by creating a large gap between it and the competition.
+
+**What this shows:** `"any"` is not genre-neutral — it's genre-generous. It gives every song a bonus that previously only the correct-genre songs earned, which reshuffles the whole ranking around the numerical features.
+
+---
+
+### Experiment 5 — Score Spread Across the Full Catalog
+
+For each profile, I scored all 18 songs and measured the range:
+
+```
+Profile   Min    Max   Mean  Spread   Top song
+────────  ─────  ────  ────  ──────   ──────────────────────
+Casey     1.95   8.01  4.39   6.06    Blinding Lights
+Riley     2.38   8.79  4.23   6.41    Smells Like Teen Spirit
+Morgan    5.00   8.56  6.25   3.56    Redbone
+Drew      2.96   6.68  4.30   3.72    Fast Car
+```
+
+Casey and Riley both show **strong discrimination (6+ pts spread)** — specific genre + mood preferences create a wide gap between the best and worst matches. Morgan and Drew show **moderate discrimination (~3.6 pts)** — Morgan because `preferred_genre="any"` lifts all scores, and Drew because there is only one folk song in the catalog so the genre bonus goes to only one song.
+
+**What this shows:** The system works best for listeners with a clearly defined genre preference that appears in the catalog. Broad listeners ("any genre") and niche listeners (genre not well-represented) get weaker, noisier rankings.
+
+---
+
+### Summary — Strengths and Weaknesses
+
+| Situation | Result | Verdict |
+|---|---|---|
+| Specific genre + mood match | 9.0/9.0, 3.96 pt gap to #2 | Works very well |
+| Genre in catalog, mood mismatch | 5–7 pt range, still sensible | Works adequately |
+| Genre not in catalog | Scores compress, weak ranking | Breaks down |
+| Contradictory profile | Picks least-wrong, not right | Fundamental limit |
+| `preferred_genre="any"` | Too generous, reshuffles ranking | Design weakness |
+| Small catalog (1 song per genre) | Low spread, weak confidence | Data problem |
+
+The biggest single improvement would be replacing the `"any"` keyword with a **genre exclusion list** so open listeners can say "not classical, not grunge" rather than "literally anything." That preserves the discrimination power of the genre weight without forcing users into one label.
+
+---
+
 ## CLI Output — Default "pop / happy" Profile
 
 Run with:

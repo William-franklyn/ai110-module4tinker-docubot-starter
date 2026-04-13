@@ -3,58 +3,103 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from recommender import load_songs, recommend_songs
+from recommender import load_songs, recommend_songs, MAX_SCORE
 
 # ---------------------------------------------------------------------------
 # User profiles
 # ---------------------------------------------------------------------------
 
-PROFILES = {
-    "casey": {                          # DEFAULT — pop / happy
-        "name":               "Casey",
+# ---------------------------------------------------------------------------
+# Standard profiles — realistic listener archetypes
+# ---------------------------------------------------------------------------
+
+STANDARD_PROFILES = {
+    "high_energy_pop": {
+        "name":               "High-Energy Pop",
         "preferred_genre":    "pop",
         "preferred_mood":     "euphoric",
         "preferred_mode":     "major",
-        "target_energy":       0.78,
-        "target_valence":      0.85,
-        "target_tempo_bpm":    110,
-        "target_danceability": 0.72,
-        "target_acousticness": 0.05,
-    },
-    "riley": {
-        "name":               "Riley",
-        "preferred_genre":    "grunge",
-        "preferred_mood":     "angry",
-        "preferred_mode":     "minor",
-        "target_energy":       0.88,
-        "target_valence":      0.35,
+        "target_energy":       0.85,
+        "target_valence":      0.90,   # very happy
         "target_tempo_bpm":    125,
-        "target_danceability": 0.45,
+        "target_danceability": 0.85,   # wants to dance
         "target_acousticness": 0.02,
     },
-    "morgan": {
-        "name":               "Morgan",
-        "preferred_genre":    "any",
+    "chill_lofi": {
+        "name":               "Chill Lofi",
+        "preferred_genre":    "any",   # lofi spans r&b, hip-hop, soul
         "preferred_mood":     "chill",
         "preferred_mode":     "minor",
-        "target_energy":       0.25,
-        "target_valence":      0.40,
-        "target_tempo_bpm":    85,
-        "target_danceability": 0.55,
-        "target_acousticness": 0.35,
+        "target_energy":       0.18,   # barely audible, background
+        "target_valence":      0.35,
+        "target_tempo_bpm":    72,     # slow enough to think over
+        "target_danceability": 0.48,
+        "target_acousticness": 0.45,   # warm, textured
     },
-    "drew": {
-        "name":               "Drew",
-        "preferred_genre":    "folk",
-        "preferred_mood":     "peaceful",
-        "preferred_mode":     "major",
-        "target_energy":       0.28,
-        "target_valence":      0.52,
-        "target_tempo_bpm":    80,
-        "target_danceability": 0.38,
-        "target_acousticness": 0.82,
+    "deep_intense_rock": {
+        "name":               "Deep Intense Rock",
+        "preferred_genre":    "rock",
+        "preferred_mood":     "angry",
+        "preferred_mode":     "minor",
+        "target_energy":       0.92,   # maximum loudness
+        "target_valence":      0.22,   # dark
+        "target_tempo_bpm":    130,
+        "target_danceability": 0.38,   # not a dance track
+        "target_acousticness": 0.01,   # fully electric
     },
 }
+
+# ---------------------------------------------------------------------------
+# Adversarial profiles — designed to expose edge cases and scoring quirks
+# ---------------------------------------------------------------------------
+
+ADVERSARIAL_PROFILES = {
+    "sad_bangers": {
+        # Conflict: very high energy (0.90) but wants melancholy mood.
+        # No song in the catalog is both loud and melancholy.
+        # Watch whether energy or mood wins the tiebreak.
+        "name":               "Sad Bangers (adversarial)",
+        "preferred_genre":    "any",
+        "preferred_mood":     "melancholy",
+        "preferred_mode":     "minor",
+        "target_energy":       0.90,
+        "target_valence":      0.20,
+        "target_tempo_bpm":    140,
+        "target_danceability": 0.60,
+        "target_acousticness": 0.05,
+    },
+    "the_completist": {
+        # Every preference is dead-centre (0.5 / "any").
+        # All songs should score very similarly — no real discrimination.
+        # Reveals how much the system relies on categorical matches.
+        "name":               "The Completist (adversarial)",
+        "preferred_genre":    "any",
+        "preferred_mood":     "any",
+        "preferred_mode":     "any",
+        "target_energy":       0.50,
+        "target_valence":      0.50,
+        "target_tempo_bpm":    100,
+        "target_danceability": 0.50,
+        "target_acousticness": 0.50,
+    },
+    "classical_purist": {
+        # Wants classical music at near-zero energy.
+        # Only 2 classical songs exist. Tests catalog thinness.
+        # Also: very slow tempo (68 BPM) and high acousticness.
+        "name":               "Classical Purist (adversarial)",
+        "preferred_genre":    "classical",
+        "preferred_mood":     "peaceful",
+        "preferred_mode":     "minor",
+        "target_energy":       0.01,
+        "target_valence":      0.20,
+        "target_tempo_bpm":    68,
+        "target_danceability": 0.18,
+        "target_acousticness": 0.99,
+    },
+}
+
+# Run all profiles in this order
+PROFILES = {**STANDARD_PROFILES, **ADVERSARIAL_PROFILES}
 
 WIDTH = 60
 
@@ -67,7 +112,7 @@ def divider(char="-"):
     print("  " + char * WIDTH)
 
 
-def score_bar(score, max_score=9.0, width=20):
+def score_bar(score, max_score=MAX_SCORE, width=20):
     filled = int((score / max_score) * width)
     return "[" + "#" * filled + "." * (width - filled) + "]"
 
@@ -92,7 +137,7 @@ def print_recommendations(songs, profile, top_n=5):
     for rank, (song, score, reasons) in enumerate(results, start=1):
         bar = score_bar(score)
         print(f"\n  #{rank}  {song['title']} by {song['artist']}")
-        print(f"       Score : {score:.2f} / 9.0  {bar}")
+        print(f"       Score : {score:.2f} / {MAX_SCORE:.1f}  {bar}")
         print(f"       Genre : {song['genre']}  |  "
               f"Mood: {song['mood']}  |  "
               f"Energy: {song['energy']}  |  "
@@ -120,7 +165,12 @@ def main():
     print(f"  Catalog : {len(songs)} songs loaded")
     divider("=")
 
-    for profile in PROFILES.values():
+    print("\n  -- STANDARD PROFILES --\n")
+    for profile in STANDARD_PROFILES.values():
+        print_recommendations(songs, profile, top_n=5)
+
+    print("\n  -- ADVERSARIAL PROFILES --\n")
+    for profile in ADVERSARIAL_PROFILES.values():
         print_recommendations(songs, profile, top_n=5)
 
 
