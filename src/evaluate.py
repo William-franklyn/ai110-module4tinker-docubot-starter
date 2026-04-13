@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from recommender import load_songs, score_song, recommend_songs
+from recommender import load_songs, score_song, recommend_songs, MAX_SCORE
 
 WIDTH = 62
 
@@ -33,9 +33,9 @@ def header(title):
 
 
 def show_result(rank, song, score, reasons, show_reasons=True):
-    bar = "[" + "#" * int((score / 9.0) * 20) + "." * (20 - int((score / 9.0) * 20)) + "]"
+    bar = "[" + "#" * int((score / MAX_SCORE) * 20) + "." * (20 - int((score / MAX_SCORE) * 20)) + "]"
     print(f"\n  #{rank}  {song['title']} by {song['artist']}")
-    print(f"       Score : {score:.2f} / 9.0  {bar}")
+    print(f"       Score : {score:.2f} / {MAX_SCORE:.1f}  {bar}")
     if show_reasons:
         for r in reasons:
             tag = "  +" if ("match" in r and "mismatch" not in r) else "  ~"
@@ -144,8 +144,7 @@ def experiment_contradictory(songs):
 
     results = recommend_songs(profile, songs, k=5)
     print("  Top 5 (showing score + genre/mood for each):")
-    for rank, (song, score, reasons) in enumerate(results, 1):
-        bar = "#" * int((score / 9.0) * 20)
+    for rank, (song, score, _) in enumerate(results, 1):
         print(f"  #{rank}  [{score:.2f}]  {song['title']}")
         print(f"        mood={song['mood']}  energy={song['energy']}  genre={song['genre']}")
 
@@ -202,7 +201,7 @@ def experiment_genre_weight(songs):
             bl_without = score
     print(f"  'Blinding Lights' score:  {bl_with:.2f} (with genre)  vs  {bl_without:.2f} (any)")
     print(f"  Genre bonus: +{bl_with - bl_without:.2f} pts — that is "
-          f"{((bl_with - bl_without) / 9.0 * 100):.0f}% of the max score.")
+          f"{((bl_with - bl_without) / MAX_SCORE * 100):.0f}% of the max score.")
     print("  Verdict: genre lock-in is powerful — it can suppress great songs")
     print("  that don't carry the right label.")
 

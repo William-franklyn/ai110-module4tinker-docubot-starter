@@ -81,7 +81,7 @@ def score_song(song, user_profile):
     """Score one song against a user profile.
 
     Returns a tuple of (score, reasons):
-        score   — total points earned, float in range 0.0 to 9.0
+        score   — total points earned, float in range 0.0 to MAX_SCORE
         reasons — list of strings explaining every point contribution
 
     Categorical rules (binary — full points or zero):
